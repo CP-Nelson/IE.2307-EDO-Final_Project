@@ -2,25 +2,41 @@
 #include "pmsis.h"
 #include "NN_Functions.h"
 
+uint32_t cycles;
+uint32_t tim_cycles;
+uint32_t executed_instructions;
+uint32_t load_hazards;
+uint32_t jump_hazards;
+
 /* Task executed by cluster cores. */
 void cluster_helloworld(void *arg)
 {
     uint32_t core_id = pi_core_id(), cluster_id = pi_cluster_id();
-    printf("[%d %d] Hell World!\n", cluster_id, core_id);
-    // switch (core_id)
-    // {
-    // case 0:
-    // initialize();
-    // break;
-    // case 2:
-    // training_process();
-    // break;
-    // case 3:
-    // prediction_process();
-    // break;
-    // default:
-    // break;
-    // }
+    // printf("[%d %d] Hello World!\n", cluster_id, core_id);
+    switch (core_id)
+    {
+    case 0:
+        printf("[%d %d] cycles of active cores = %d\n", cluster_id, core_id, cycles);
+        break;
+    case 1:
+        printf("[%d %d] executed instruments = %d\n", cluster_id, core_id, executed_instructions);
+        break;
+    case 2:
+        printf("[%d %d] loaded hazards = %d\n", cluster_id, core_id, load_hazards);
+        break;
+    case 3:
+        printf("[%d %d] jumped hazards = %d\n", cluster_id, core_id, jump_hazards);
+        break;
+    case 4:
+        initialize();
+        break;
+    case 5:
+        training_process();
+        prediction_process();
+        break;
+    default:
+        break;
+    }
 }
 
 /* Cluster main entry, executed by core 0. */
@@ -29,9 +45,9 @@ void cluster_delegate(void *arg)
     printf("Cluster master core entry\n");
     /* Task dispatch to cluster cores. */
     pi_cl_team_fork(pi_cl_cluster_nb_cores(), cluster_helloworld, arg);
-    initialize();
-    training_process();
-    prediction_process();
+    // initialize();
+    // training_process();
+    // prediction_process();
     printf("Cluster master core exit\n");
 }
 
@@ -52,7 +68,7 @@ void helloworld(void)
     /* Configure & open cluster. */
     pi_open_from_conf(&cluster_dev, &cl_conf);
 
-    pi_perf_conf(1 << PI_PERF_CYCLES | 1 << PI_PERF_ACTIVE_CYCLES);
+    pi_perf_conf(1 << PI_PERF_CYCLES | 1 << PI_PERF_ACTIVE_CYCLES | 1 << PI_PERF_INSTR | 1 << PI_PERF_LD_STALL | 1 << PI_PERF_JR_STALL);
     pi_perf_reset();
     pi_perf_start();
 
@@ -63,8 +79,11 @@ void helloworld(void)
     }
 
     pi_perf_stop();
-    uint32_t cycles = pi_perf_read(PI_PERF_ACTIVE_CYCLES);
-    uint32_t tim_cycles = pi_perf_read(PI_PERF_CYCLES);
+    cycles = pi_perf_read(PI_PERF_ACTIVE_CYCLES);
+    tim_cycles = pi_perf_read(PI_PERF_CYCLES);
+    executed_instructions = pi_perf_read(PI_PERF_INSTR);
+    load_hazards = pi_perf_read(PI_PERF_LD_STALL);
+    jump_hazards = pi_perf_read(PI_PERF_JR_STALL);
     printf("Perf : %d cycles Timer : %d cycles\n", cycles, tim_cycles);
 
     /* Prepare cluster task and send it to cluster. */
